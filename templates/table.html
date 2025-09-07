@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Pretty JSON → Table</title>
+  <style>
+    :root {
+      --bg: #0b1020;
+      --panel: #121935;
+      --muted: #8aa0ff;
+      --text: #e7ecff;
+      --text-dim: #b9c2ff;
+      --accent: #6ee7b7;
+      --border: #2a3566;
+      --row: #0f1733;
+      --row-alt: #101a3d;
+      --shadow: 0 10px 30px rgba(0,0,0,.4);
+    }
+
+    html,body { height: 100%; }
+    body {
+      margin: 0; font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Inter, "Helvetica Neue", Arial, "Noto Sans", "Apple Color Emoji", "Segoe UI Emoji";
+      background: radial-gradient(1200px 800px at 20% -20%, #243b7b55, transparent 60%), radial-gradient(1200px 800px at 120% 20%, #0ea5e955, transparent 60%), var(--bg);
+      color: var(--text);
+    }
+
+    .wrap { max-width: 1100px; margin: 40px auto; padding: 0 16px; }
+    .card {
+      background: linear-gradient(180deg, rgba(255,255,255,.04), rgba(255,255,255,.02));
+      border: 1px solid var(--border); border-radius: 18px; box-shadow: var(--shadow);
+      overflow: hidden; backdrop-filter: blur(4px);
+    }
+    .header {
+      padding: 18px 22px; display: flex; gap: 12px; align-items: center; justify-content: space-between;
+      border-bottom: 1px solid var(--border);
+      background: linear-gradient(180deg, rgba(108,99,255,.18), rgba(108,99,255,.06));
+    }
+    .header h1 { font-size: 18px; margin: 0; font-weight: 600; color: var(--text); letter-spacing: .3px; }
+    .muted { color: var(--text-dim); font-size: 13px; }
+
+    .controls { display: grid; grid-template-columns: 1fr 1fr auto auto; gap: 12px; padding: 16px; border-bottom: 1px solid var(--border); }
+    @media (max-width: 760px){ .controls{ grid-template-columns: 1fr; } }
+
+    .input, .select, .button {
+      display: inline-flex; align-items: center; gap: 8px; width: 100%;
+      background: #0f1530; color: var(--text); border: 1px solid var(--border);
+      border-radius: 12px; padding: 10px 12px; font-size: 14px; outline: none;
+      transition: border-color .2s ease, transform .05s ease;
+    }
+    .input:focus, .select:focus { border-color: var(--muted); }
+    .button { width: auto; cursor: pointer; user-select: none; }
+    .button:hover { border-color: var(--muted); transform: translateY(-1px); }
+    .button.secondary { background: transparent; }
+
+    .drop {
+      display:flex; gap:8px; align-items:center; padding: 10px 12px; border:1px dashed var(--border);
+      border-radius:12px; background:#0b1230; color:var(--text-dim); cursor:pointer; justify-content:center;
+    }
+    .drop input{ display:none; }
+
+    .table-wrap { overflow:auto; max-height: 70vh; }
+
+    table { width: 100%; border-collapse: separate; border-spacing: 0; }
+    thead { position: sticky; top: 0; z-index: 2; }
+    th, td { padding: 12px 14px; border-bottom: 1px solid var(--border); text-align: left; white-space: nowrap; }
+    th { background: #10183a; position: sticky; top: 0; font-weight: 600; color: var(--muted); backdrop-filter: blur(6px); cursor: pointer; }
+    th .caret { margin-left: 6px; opacity: .7; font-size: 12px; }
+    tbody tr { background: var(--row); }
+    tbody tr:nth-child(even) { background: var(--row-alt); }
+    tbody tr:hover { background: #17224a; }
+    td { color: var(--text); font-variant-numeric: tabular-nums; }
+
+    .footer { display:flex; flex-wrap: wrap; gap:10px; align-items:center; justify-content: space-between; padding: 12px 16px; }
+    .pager { display:flex; align-items:center; gap:6px; }
+    .pill { padding: 6px 10px; border-radius: 10px; border: 1px solid var(--border); background:#0f1530; }
+
+    .empty { padding: 28px; text-align:center; color: var(--text-dim); }
+    .kbd { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; background:#0e1430; border:1px solid var(--border); border-radius:8px; padding:2px 6px; font-size:12px; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="card">
+      <div class="header">
+        <div>
+          <h1>BikeTrain Checkin Viewer</h1>
+          <div class="muted">Click Column headers to sort. Type to filter.</div>
+        </div>
+      </div>
+
+      <div class="controls">
+        <input id="search" class="input" type="search" placeholder="Search (filters all columns)…" />
+        <select id="pageSize" class="select">
+          <option value="10">10 rows</option>
+          <option value="25">25 rows</option>
+          <option value="50">50 rows</option>
+          <option value="100">100 rows</option>
+        </select>
+      </div>
+
+      <div class="table-wrap">
+        <table id="table">
+          <thead id="thead"></thead>
+          <tbody id="tbody"></tbody>
+        </table>
+      </div>
+
+      <div class="footer">
+        <div id="summary" class="muted">No data yet.</div>
+        <div class="pager">
+          <button class="button" id="prevBtn">◀ Prev</button>
+          <span class="pill" id="pageLabel">Page 0/0</span>
+          <button class="button" id="nextBtn">Next ▶</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // --- Utilities ---
+    const $ = (sel) => document.querySelector(sel);
+    const $$ = (sel) => Array.from(document.querySelectorAll(sel));
+
+    const state = {
+      raw: [],
+      columns: [],
+      sort: [], // [{key, dir}]
+      page: 1,
+      pageSize: 10,
+      filter: "",
+      inputText: "",
+    };
+
+    function inferColumns(rows){
+      const keys = new Set();
+      rows.forEach(r => Object.keys(r || {}).forEach(k => keys.add(k)));
+      return Array.from(keys);
+    }
+
+    function coerce(val){
+      // For natural sorting
+      if (val == null) return "";
+      if (typeof val === 'number') return val;
+      if (typeof val === 'boolean') return val ? 1 : 0;
+      // detect ISO dates
+      if (typeof val === 'string' && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/.test(val)) {
+        const t = Date.parse(val); if(!isNaN(t)) return t; // numeric timestamp for sorting
+      }
+      const num = Number(val);
+      if (!isNaN(num) && val.trim() !== "") return num;
+      return String(val).toLowerCase();
+    }
+
+    function sortRows(rows){
+      if (!state.sort.length) return rows;
+      const keys = state.sort;
+      return [...rows].sort((a,b)=>{
+        for (const {key, dir} of keys){
+          const av = coerce(a[key]);
+          const bv = coerce(b[key]);
+          if (av < bv) return dir === 'asc' ? -1 : 1;
+          if (av > bv) return dir === 'asc' ? 1 : -1;
+        }
+        return 0;
+      });
+    }
+
+    function filterRows(rows){
+      const q = state.filter.trim().toLowerCase();
+      if (!q) return rows;
+      return rows.filter(r => state.columns.some(c => String(r[c] ?? '').toLowerCase().includes(q)));
+    }
+
+    function paginate(rows){
+      const start = (state.page - 1) * state.pageSize;
+      return rows.slice(start, start + state.pageSize);
+    }
+
+    function renderTable(){
+      const rows = filterRows(sortRows(state.raw));
+      const total = rows.length;
+      const pages = Math.max(1, Math.ceil(total / state.pageSize));
+      state.page = Math.min(state.page, pages);
+
+      // Render head
+      const thead = $('#thead');
+      thead.innerHTML = '';
+      const trh = document.createElement('tr');
+      state.columns.forEach(col => {
+        const th = document.createElement('th');
+        th.textContent = col;
+        const caret = document.createElement('span'); caret.className = 'caret'; caret.textContent = '↕';
+        th.appendChild(caret);
+        th.addEventListener('click', (e)=> onSortClick(col, e.shiftKey));
+        trh.appendChild(th);
+      });
+      thead.appendChild(trh);
+
+      // Render body
+      const pageRows = paginate(rows);
+      const tbody = $('#tbody');
+      tbody.innerHTML = '';
+      if (!pageRows.length){
+        const tr = document.createElement('tr');
+        const td = document.createElement('td');
+        td.colSpan = state.columns.length || 1; td.className = 'empty';
+        td.textContent = 'No matching rows';
+        tr.appendChild(td); tbody.appendChild(tr);
+      } else {
+        for (const r of pageRows){
+          const tr = document.createElement('tr');
+          for (const c of state.columns){
+            const td = document.createElement('td');
+            let v = r[c];
+            if (v === null || v === undefined) v = '';
+            if (typeof v === 'object') v = JSON.stringify(v);
+            td.textContent = v;
+            tr.appendChild(td);
+          }
+          tbody.appendChild(tr);
+        }
+      }
+
+      // footer
+      $('#pageLabel').textContent = `Page ${state.page}/${pages}`;
+      $('#summary').textContent = `${total.toLocaleString()} rows • ${state.columns.length} columns`;
+      $('#prevBtn').disabled = state.page <= 1;
+      $('#nextBtn').disabled = state.page >= pages;
+    }
+
+    function onSortClick(col, multi){
+      const i = state.sort.findIndex(s => s.key === col);
+      if (i === -1) {
+        state.sort = multi ? [...state.sort, {key: col, dir: 'asc'}] : [{key: col, dir: 'asc'}];
+      } else {
+        const cur = state.sort[i];
+        if (cur.dir === 'asc') cur.dir = 'desc';
+        else { // remove if toggled past desc in multi, or reset in single
+          if (multi) state.sort.splice(i,1); else state.sort = [];
+        }
+      }
+      state.page = 1; renderTable();
+    }
+
+    function setData(rows){
+      if (!Array.isArray(rows)) throw new Error('Data must be an array of objects');
+      state.raw = rows.map(r => ({...r}));
+      state.columns = inferColumns(state.raw);
+      state.page = 1; renderTable();
+    }
+
+    // --- Events ---
+    $('#search').addEventListener('input', e => { state.filter = e.target.value; state.page = 1; renderTable(); });
+    $('#pageSize').addEventListener('change', e => { state.pageSize = parseInt(e.target.value, 10) || 10; state.page = 1; renderTable(); });
+    $('#prevBtn').addEventListener('click', () => { state.page = Math.max(1, state.page - 1); renderTable(); });
+    $('#nextBtn').addEventListener('click', () => { state.page = state.page + 1; renderTable(); });
+
+    // initialize 
+    (function(){
+      {%- if items %}
+        const sample=[{%- for item in items %}{item_id:'{{- item.item_id}}', datetime:'{{- item.datetime}}'},{%- endfor %}]
+      {%- else %}
+        const sample=[{item_id:'i1_demo', datetime:new Date().toISOString()}];
+      {%- endif %}
+      state.inputText = JSON.stringify(sample, null, 2);
+      setData(sample);
+    })();
+  </script>
+</body>
+</html>
