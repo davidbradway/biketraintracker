@@ -30,7 +30,7 @@ def create(item_id):
         if week_number not in unique_weeks:
             unique_weeks.append(week_number)
             week_count = week_count + 1
-    return f"<h1>{week_count} week(s)</h1>"
+    return render_template("results.html", d={'week_count': week_count, 'datetime': data['datetime']})
 
 
 @app.route("/json")

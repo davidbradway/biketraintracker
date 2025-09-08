@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Rider Results!</title>
+  <style>
+    :root {
+      --bg: #fbf7ed; /* light, print-friendly */
+      --text: #1a1a1a;
+    }
+    * { box-sizing: border-box; }
+    html, body { height: 100%; }
+    body {
+      margin: 0;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, "Helvetica Neue", Arial, "Noto Sans";
+      background: var(--bg);
+      color: var(--text);
+    }
+
+    /* Full-height layout */
+    .frame { min-height: 100svh; display: grid; grid-template-rows: 1fr auto; }
+    .muted { color: var(--text-dim); font-size: 15px; text-align: center;}
+    .hero { margin: 0; padding: 2vh 2vw; display: flex; align-items: center; justify-content: center; }
+    .hero img { display: block; max-width: 100%; max-height: 100%; object-fit: contain; }
+
+    /* Big, viewport-height-based title text */
+    .title {
+      width: 100%;
+      margin: 0 0 2vh;
+      text-align: center;
+      font-size: clamp(28px, 9.5vh, 18vh);
+      font-weight: 900;
+      line-height: 1;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+    /* If the browser supports it, stretch the glyphs a bit for a wider look */
+    @supports (font-stretch: 125%) {
+      .title { font-stretch: 125%; }
+    }
+  </style>
+</head>
+<body>
+  <main class="frame">
+  {%- if d %}
+    <h1 class="title">{{- d.week_count}} Week Rider</h1>
+    <div class="muted">{{- d.datetime}}</div>
+  {%- endif %}
+  <figure class="hero">
+    <img src="{{- url_for('static', filename='cartoon-style trophy.png') }}" alt="Golden trophy with a bicycle on top" />
+  </figure>
+  </main>
+</body>
+</html>
