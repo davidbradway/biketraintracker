@@ -3,7 +3,7 @@ from tinydb import TinyDB, Query
 from flask import Flask, render_template, jsonify
 
 app = Flask(__name__)
-db = TinyDB("db.json")
+db = TinyDB('db.json', sort_keys=True, indent=4, separators=(',', ': '))
 
 
 @app.route("/")
