@@ -1,6 +1,6 @@
 from datetime import datetime
 from tinydb import TinyDB, Query
-from flask import Flask, render_template
+from flask import Flask, render_template, jsonify
 
 app = Flask(__name__)
 db = TinyDB("db.json")
@@ -36,4 +36,4 @@ def create(item_id):
 @app.route("/json")
 def json():
     all_items = db.all()
-    return str(all_items)
+    return jsonify(all_items)
