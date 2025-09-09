@@ -12,10 +12,11 @@ python -m venv venv
 pip install -r requirements.txt
 
 # Run
-flask --app go run --host=0.0.0.0
+flask run --host=0.0.0.0
 
 # URLs:
 http://127.0.0.1:5000/
 http://127.0.0.1:5000/i/1
 http://127.0.0.1:5000/json
+http://192.168.1.175:5000
 ```
